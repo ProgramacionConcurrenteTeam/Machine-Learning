@@ -2,23 +2,37 @@ package logisticregression
 
 import (
 	"fmt"
+	"io/ioutil"
+
 	"github.com/cdipaolo/goml/base"
 	"github.com/cdipaolo/goml/linear"
-	
-	"io/ioutil"
 )
 
-// ConfusionMatrix describes a confusion matrix
+// Para evaluar el rendimiento de nuestro modelo entrenado en el
+// conjunto de pruebas. Para ello, crearemos la denominada
+// Matriz de Confusión con la siguiente estructura de datos
+
 type ConfusionMatrix struct {
-	positive      int
-	negative      int
-	truePositive  int
-	trueNegative  int
-	falsePositive int
-	falseNegative int
-	recall        float64
-	precision     float64
-	accuracy      float64
+	positive int //El numero de ejemplos positivos
+
+	negative int //El numero de ejemplos negativos
+
+	truePositive int //El numero de ejemplos positivos que se
+	//predijeron de manera correcta
+
+	trueNegative int //El numero de ejemplos negativos que se
+	//predijeron de manera correcta
+
+	falsePositive int //El numero de ejemplos positivos que se
+	//predijeron de manera incorrecta
+
+	falseNegative int //El numero de ejemplos negativos que se
+	//predijeron de manera incorrecta
+
+	recall    float64
+	precision float64
+	accuracy  float64 //medidia para la precision del modelo
+	//este esta definido como (truePositive + trueNegative) / (positive + negative)
 }
 
 func (cm ConfusionMatrix) String() string {
@@ -26,15 +40,15 @@ func (cm ConfusionMatrix) String() string {
 		cm.positive, cm.negative, cm.truePositive, cm.trueNegative, cm.falsePositive, cm.falseNegative, cm.recall, cm.precision, cm.accuracy)
 }
 
-// Run executes this example
 func Run() error {
 	fmt.Println("Running Logistic Regression...")
-	// Load data set
+	// Cargando la data
+	//Cambiar al endpoint
 	xTrain, yTrain, err := base.LoadDataFromCSV("./data/studentsTrain.csv")
 	if err != nil {
 		return err
 	}
-	xTest, yTest, err := base.LoadDataFromCSV("./data/studentsTest.csv")
+	xData, yData, err := base.LoadDataFromCSV("./data/studentsTest.csv")
 	if err != nil {
 		return err
 	}
@@ -42,13 +56,11 @@ func Run() error {
 	var maxAccuracy float64
 	var maxAccuracyCM *ConfusionMatrix
 	var maxAccuracyDb float64
-	var maxAccuracyIter int
 	var maxAccuracyModel *linear.Logistic
 
-	//Try different parameters to get the best model
 	for iter := 100; iter < 3000; iter += 500 {
 		for db := 0.05; db < 1.0; db += 0.01 {
-			cm, model, err := tryValues(0.0001, 0.0, iter, db, xTrain, xTest, yTrain, yTest)
+			cm, model, err := tryValues(0.0001, 0.0, iter, db, xTrain, xData, yTrain, yData)
 			if err != nil {
 				return err
 			}
@@ -57,61 +69,24 @@ func Run() error {
 				maxAccuracyCM = cm
 				maxAccuracyDb = db
 				maxAccuracyModel = model
-				maxAccuracyIter = iter
+
 			}
 		}
 	}
 
-	fmt.Printf("Maximum accuracy: %.2f\n\n", maxAccuracy)
-	fmt.Printf("with Model: %s\n\n", maxAccuracyModel)
-	fmt.Printf("with Confusion Matrix:\n%s\n\n", maxAccuracyCM)
-	fmt.Printf("with Decision Boundary: %.2f\n", maxAccuracyDb)
-	fmt.Printf("with Num Iterations: %d\n", maxAccuracyIter)
-
-	// if err := plotData(xTrain, yTrain); err != nil {
-	// 	return err
-	// }
+	fmt.Printf("Maxima Precicion: %.2f\n\n", maxAccuracy)
+	fmt.Printf("Con el modelo: %s\n\n", maxAccuracyModel)
+	fmt.Printf("Con la Matriz de confusion:\n%s\n\n", maxAccuracyCM)
+	fmt.Printf("con límite de decisión: %.2f\n", maxAccuracyDb)
 
 	return nil
 }
 
-// func plotData(xTest [][]float64, yTest []float64) error {
-// 	p,err := plot.New()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	p.Title.Text = "Exam Results"
-// 	p.X.Label.Text = "X"
-// 	p.Y.Label.Text = "Y"
-// 	p.X.Max = 120
-// 	p.Y.Max = 120
+func tryValues(learningRate float64, regularization float64, iterations int, decisionBoundary float64, xTrain, xData [][]float64, yTrain, yData []float64) (*ConfusionMatrix, *linear.Logistic, error) {
+	//Recopilando todos los valores positivos y negativos del data set
 
-// 	positives := make(plotter.XYs, len(yTest))
-// 	negatives := make(plotter.XYs, len(yTest))
-// 	for i := range xTest {
-// 		if yTest[i] == 1.0 {
-// 			positives[i].X = xTest[i][0]
-// 			positives[i].Y = xTest[i][1]
-// 		}
-// 		if yTest[i] == 0.0 {
-// 			negatives[i].X = xTest[i][0]
-// 			negatives[i].Y = xTest[i][1]
-// 		}
-// 	}
-
-// 	err = plotutil.AddScatters(p, "Negatives", negatives, "Positives", positives)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if err := p.Save(10*vg.Inch, 10*vg.Inch, "exams.png"); err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
-func tryValues(learningRate float64, regularization float64, iterations int, decisionBoundary float64, xTrain, xTest [][]float64, yTrain, yTest []float64) (*ConfusionMatrix, *linear.Logistic, error) {
 	cm := ConfusionMatrix{}
-	for _, y := range yTest {
+	for _, y := range yData {
 		if y == 1.0 {
 			cm.positive++
 		}
@@ -120,7 +95,7 @@ func tryValues(learningRate float64, regularization float64, iterations int, dec
 		}
 	}
 
-	// Instantiate and Learn the Model
+	//entrenando el modelo
 	model := linear.NewLogistic(base.BatchGA, learningRate, regularization, iterations, xTrain, yTrain)
 	model.Output = ioutil.Discard
 	err := model.Learn()
@@ -128,13 +103,14 @@ func tryValues(learningRate float64, regularization float64, iterations int, dec
 		return nil, nil, err
 	}
 
-	// Evaluate the Model on the Test data
-	for i := range xTest {
-		prediction, err := model.Predict(xTest[i])
+	// Se itira sonre el dataset y se predicen los resultados por cada putno
+	//del dato y se registra en la matriz de confusion
+	for i := range xData {
+		prediction, err := model.Predict(xData[i])
 		if err != nil {
 			return nil, nil, err
 		}
-		y := int(yTest[i])
+		y := int(yData[i])
 		positive := prediction[0] >= decisionBoundary
 
 		if y == 1 && positive {
@@ -151,7 +127,7 @@ func tryValues(learningRate float64, regularization float64, iterations int, dec
 		}
 	}
 
-	// Calculate Evaluation Metrics
+	// Calculando las metricas
 	cm.recall = float64(cm.truePositive) / float64(cm.positive)
 	cm.precision = float64(cm.truePositive) / (float64(cm.truePositive) + float64(cm.falsePositive))
 	cm.accuracy = float64(float64(cm.truePositive)+float64(cm.trueNegative)) / float64(float64(cm.positive)+float64(cm.negative))
