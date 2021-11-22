@@ -44,11 +44,11 @@ func Run() error {
 	fmt.Println("Running Logistic Regression...")
 	// Cargando la data
 	//Cambiar al endpoint
-	xTrain, yTrain, err := base.LoadDataFromCSV("./data/studentsTrain.csv")
+	xTrain, yTrain, err := base.LoadDataFromCSV("./data/Train.csv")
 	if err != nil {
 		return err
 	}
-	xData, yData, err := base.LoadDataFromCSV("./data/studentsTest.csv")
+	xData, yData, err := base.LoadDataFromCSV("./data/Test.csv")
 	if err != nil {
 		return err
 	}
